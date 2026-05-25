@@ -1,5 +1,12 @@
 .venv
 .vscode
 .env
-datasets/piglife
 .hf_cache
+.claude
+
+datasets/piglife
+
+*.pt
+runs/
+
+reports/output/

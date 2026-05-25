@@ -19,15 +19,14 @@ load_dotenv()
 PIGLIFE_URL = os.getenv("PIGLIFE_URL")
 
 def ensure_directories():
-    """Ensures the required directory structure exists."""
     for d in [ZIP_DIR, RAW_DIR, PIGLIFE_DIR]:
         d.mkdir(parents=True, exist_ok=True)
 
 @task
 def download(c):
-    """Downloads the PigLife dataset zip file."""
+    """Download the PigLife dataset zip file."""
     ensure_directories()
-    
+
     if not PIGLIFE_URL or PIGLIFE_URL == "YOUR_LINK_HERE":
         console.print("[bold red]Error:[/bold red] PIGLIFE_URL not defined in .env")
         raise ValueError("Please set PIGLIFE_URL in your .env file.")
@@ -44,7 +43,7 @@ def download(c):
 
 @task(pre=[download])
 def setup(c):
-    """Unzips, sanitizes, and converts the dataset to YOLO format."""
+    """Unzip, sanitize, split and convert the human-annotated dataset to YOLO format."""
     ensure_directories()
     piglife_zip = ZIP_DIR / "piglife.zip"
     images_dir = RAW_DIR / "Image"
@@ -54,7 +53,7 @@ def setup(c):
         TextColumn("[progress.description]{task.description}"),
         transient=True,
     ) as progress:
-        
+
         if not any(RAW_DIR.iterdir()):
             progress.add_task(description="Extracting main dataset...", total=None)
             c.run(f'unzip -q "{piglife_zip}" -d "{RAW_DIR}" -x "Video/*"')
@@ -63,7 +62,7 @@ def setup(c):
         for zname in ("train.zip", "test.zip"):
             zip_path = images_dir / zname
             target_folder = images_dir / zname.replace(".zip", "")
-            
+
             if zip_path.exists() and not target_folder.exists():
                 progress.add_task(description=f"Unzipping {zname}...", total=None)
                 c.run(f'unzip -q "{zip_path}" -d "{images_dir}"')
@@ -71,28 +70,31 @@ def setup(c):
         c.run(f'unzip -q "{RAW_DIR / "Names.zip"}" -d "{RAW_DIR}"')
 
     console.print("[white]Data processing pipeline:[/white]")
-    
+
     steps = [
-        ("Sanitizing filenames", "sanitize.py"),
-        ("Splitting dataset (train/val)", "split.py"),
-        ("Converting COCO to YOLO format", "convert.py"),
-        ("Organizing final directory structure", "organize.py"),
+        ("Sanitizing filenames",            "sanitize.py",  ""),
+        ("Splitting dataset (train/val)",   "split.py",     ""),
+        ("Converting COCO → YOLO (human)", "convert.py",   "--source human"),
+        ("Organizing directory structure",  "organize.py",  ""),
     ]
 
-    for desc, script in steps:
+    for desc, script, args in steps:
+        cmd = f'uv run python "{PROJECT_DIR}/datasets/{script}"'
+        if args:
+            cmd += f" {args}"
         with console.status(f"[bold white]{desc}...[/bold white]"):
-            c.run(f'python "{PROJECT_DIR}/datasets/{script}"', hide=True)
-            
+            c.run(cmd, hide=True)
+
             if script == "split.py":
                 anno_path = PIGLIFE_DIR / "coco" / "human" / "annotations"
                 anno_path.mkdir(parents=True, exist_ok=True)
-                
+
                 source_json = images_dir / "pig_coco_test.json"
                 dest_json = anno_path / "instances_test.json"
-                
+
                 if source_json.exists():
                     shutil.copy2(source_json, dest_json)
-            
+
             console.print(f"  [green]✔[/green] {desc} completed.")
 
     macosx_dir = images_dir / "__MACOSX"
@@ -101,5 +103,78 @@ def setup(c):
 
 @task(pre=[setup])
 def build(c):
-    """Final task to signal completion."""
+    """Complete dataset build — download, extract, convert to YOLO format."""
     console.print("[white]YOLO structure generated at:[/white] datasets/piglife/yolo")
+
+
+@task
+def label(c):
+    """Generate SAM3 pseudo-labels for train/val/test and convert to YOLO format."""
+    console.print("[white]Teacher pipeline:[/white]")
+
+    console.print("  Running SAM3 on all images (this takes a while)...")
+    c.run(f'uv run python "{PROJECT_DIR}/teacher/label.py"')
+    console.print("  [green]✔[/green] SAM3 annotations generated.")
+
+    with console.status("[bold white]Converting SAM3 annotations → YOLO...[/bold white]"):
+        c.run(
+            f'uv run python "{PROJECT_DIR}/datasets/convert.py"'
+            f' --source sam3 --hardlink-images-from human',
+            hide=True,
+        )
+    console.print("  [green]✔[/green] SAM3 YOLO conversion complete.")
+
+
+@task
+def train(c, source=None):
+    """Train YOLOv8 (n/s/m) models. Use --source human|sam3 to train one variant."""
+    cmd = f'uv run python "{PROJECT_DIR}/student/train.py"'
+    if source:
+        cmd += f" --source {source}"
+    c.run(cmd)
+
+
+@task
+def evaluate(c, source=None):
+    """Evaluate trained YOLOv8 models on the test set. Use --source human|sam3 for one variant."""
+    cmd = f'uv run python "{PROJECT_DIR}/student/evaluate.py"'
+    if source:
+        cmd += f" --source {source}"
+    c.run(cmd)
+
+
+@task
+def metrics(c):
+    """Compute COCO accuracy metrics and latency benchmarks for all models."""
+    console.print("[white]Metrics pipeline:[/white]")
+
+    steps = [
+        ("Calculating COCO metrics",          "reports/scripts/calculate_metrics.py"),
+        ("Calculating per-group metrics",     "reports/scripts/metrics_per_group.py"),
+        ("Running latency benchmarks",        "reports/scripts/benchmark.py"),
+    ]
+
+    for desc, script in steps:
+        with console.status(f"[bold white]{desc}...[/bold white]"):
+            c.run(f'uv run python "{PROJECT_DIR}/{script}"', hide=True)
+        console.print(f"  [green]✔[/green] {desc} completed.")
+
+
+@task
+def report(c):
+    """Generate LaTeX tables from pre-computed metrics (run after `metrics`)."""
+    with console.status("[bold white]Generating LaTeX tables...[/bold white]"):
+        c.run(f'uv run python "{PROJECT_DIR}/reports/scripts/generate_tables.py"', hide=True)
+    console.print("  [green]✔[/green] Tables written to reports/output/latex/")
+
+
+@task
+def all(c, source=None):
+    """Run the complete pipeline end-to-end: dataset → label → train → evaluate → metrics → report."""
+    build(c)
+    label(c)
+    train(c, source=source)
+    evaluate(c, source=source)
+    metrics(c)
+    report(c)
+    console.print(Panel("[bold green]Full pipeline complete![/bold green]", border_style="green"))
