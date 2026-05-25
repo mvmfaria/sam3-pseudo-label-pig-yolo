@@ -1,6 +1,6 @@
 # SAM3-Assisted Training of Lightweight YOLO Models for Precision Pig Farming
 
-<p align="center"><a href="reports/report.pdf"><img src="img/cover.png" width="500"/></a></p>
+<p align="center"><a href="reports/report.pdf"><img src="img/cover.png" width="600"/></a></p>
 
 Knowledge distillation experiment using SAM3 as a teacher model to generate pseudo-labels for training compact YOLOv8 detection models on the PigLife dataset.
 
