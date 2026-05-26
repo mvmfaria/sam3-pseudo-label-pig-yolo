@@ -1,6 +1,11 @@
 # SAM3-Assisted Training of Lightweight YOLO Models for Precision Pig Farming
 
-<p align="center"><a href="reports/report.pdf"><img src="img/cover.png" width="600"/></a></p>
+<table width="100%"><tr>
+<td align="center" width="50%"><a href="reports/report.pdf"><img src="img/cover.png" height="300"/></a></td>
+<td align="center" width="50%"><img src="img/8ed1955d-7fa5-409b-89bf-d51c32f075d3.png" height="300"/></td>
+</tr></table>
+
+[![arXiv](https://img.shields.io/badge/arXiv-2605.25860-b31b1b.svg)](https://doi.org/10.48550/arXiv.2605.25860)
 
 Knowledge distillation experiment using SAM3 as a teacher model to generate pseudo-labels for training compact YOLOv8 detection models on the PigLife dataset.
 
@@ -148,4 +153,20 @@ uv run streamlit run extra/gallery.py
 
 ```bash
 uv run inv --list
+```
+
+---
+
+## Citation
+
+If you use this work, please cite:
+
+```bibtex
+@article{faria2026sam3,
+  title={SAM3-Assisted Training of Lightweight YOLO Models for Precision Pig Farming},
+  author={Faria, Marcos Vinicius Mendes and Pereira, Thiago Borges and Condotta, Isabella C.F.S. and Paix{\~a}o, Thiago Meireles and Boldt, Francisco de Assis},
+  journal={arXiv preprint arXiv:2605.25860},
+  year={2026},
+  doi={10.48550/arXiv.2605.25860}
+}
 ```
