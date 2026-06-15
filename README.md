@@ -162,11 +162,13 @@ uv run inv --list
 If you use this work, please cite:
 
 ```bibtex
-@article{faria2026sam3,
-  title={SAM3-Assisted Training of Lightweight YOLO Models for Precision Pig Farming},
-  author={Faria, Marcos Vinicius Mendes and Pereira, Thiago Borges and Condotta, Isabella C.F.S. and Paix{\~a}o, Thiago Meireles and Boldt, Francisco de Assis},
-  journal={arXiv preprint arXiv:2605.25860},
-  year={2026},
-  doi={10.48550/arXiv.2605.25860}
+@misc{faria2026sam3assistedtraininglightweightyolo,
+      title={SAM3-Assisted Training of Lightweight YOLO Models for Precision Pig Farming}, 
+      author={Marcos Vinicius Mendes Faria and Thiago Borges Pereira and Isabella C. F. S. Condotta and Thiago Meireles Paixão and Francisco de Assis Boldt},
+      year={2026},
+      eprint={2605.25860},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2605.25860}, 
 }
 ```
