@@ -141,6 +141,34 @@ uv run inv all
 
 ---
 
+## Extra Datasets Experiments
+
+You can also run experiments with the **BamaPig2D** and **FaroPigSeg** datasets. These datasets are converted from their original formats (COCO and YOLO Seg) to YOLO Detection format automatically.
+
+**1. Prepare the datasets**
+
+Ensure you have downloaded and unzipped them into `datasets/BamaPig2D` and `datasets/FaroPigSeg` as described in the "Expanding datasets experiments" section below. Then run:
+
+```bash
+uv run inv setup_extra
+```
+
+**2. Train models**
+
+```bash
+uv run inv train --source bama
+uv run inv train --source faro
+```
+
+**3. Evaluate models**
+
+```bash
+uv run inv evaluate --source bama
+uv run inv evaluate --source faro
+```
+
+---
+
 ## Extra tools
 
 **Interactive prediction gallery** — visualize ground truth vs. model predictions on test images:
@@ -156,6 +184,38 @@ uv run inv --list
 ```
 
 ---
+
+## Expanding datasets experiments
+
+### FaroPigSeg
+
+```bash
+cd zips/
+wget https://data.chalearnlap.cvc.uab.cat/FaroPig/FaroPigSeg.zip
+```
+
+After the download complete
+```bash
+unzip FaroPigSeg.zip -d ../datasets/
+```
+
+### BamaPig2D
+
+```bash
+cd zips/
+gdown 'https://drive.google.com/file/d/1yWBtNpYpkUdGKDqUAE7ya5m_fwinn0HN/view?usp=sharing'
+```
+
+After the download complete
+```bash
+unzip BamaPig2D.zip -d ../datasets/
+```
+
+Setup both datasets to YOLO's format
+```
+```bash
+uv run python -m invoke setup-bama-and-faro
+```
 
 ## Citation
 

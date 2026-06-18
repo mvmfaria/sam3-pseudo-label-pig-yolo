@@ -38,6 +38,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--source",
+        default=None,
+        help="Annotation source (e.g., human, sam3, bama, faro). Default: human, sam3.",
+    )
+    args = parser.parse_args()
+
+    sources = [args.source] if args.source else ["human", "sam3"]
+    for source in sources:
+        evaluate(source)
+   del model
+        torch.cuda.empty_cache()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--source",
         choices=["human", "sam3"],
         default=None,
         help="Annotation source (default: evaluate both)",

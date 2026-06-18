@@ -126,8 +126,17 @@ def label(c):
 
 
 @task
+def setup_bama_and_faro(c):
+    """Prepare BamaPig2D and FaroPigSeg datasets for detection."""
+    console.print("[white]Extra datasets pipeline:[/white]")
+    with console.status("[bold white]Preparing extra datasets...[/bold white]"):
+        c.run(f'uv run python "{PROJECT_DIR}/datasets/prepare_extra.py"', hide=True)
+    console.print("  [green]✔[/green] BamaPig2D and FaroPigSeg prepared.")
+
+
+@task
 def train(c, source=None):
-    """Train YOLOv8 (n/s/m) models. Use --source human|sam3 to train one variant."""
+    """Train YOLOv8 models. Use --source human|sam3|bama|faro."""
     cmd = f'uv run python "{PROJECT_DIR}/student/train.py"'
     if source:
         cmd += f" --source {source}"
@@ -136,7 +145,7 @@ def train(c, source=None):
 
 @task
 def evaluate(c, source=None):
-    """Evaluate trained YOLOv8 models on the test set. Use --source human|sam3 for one variant."""
+    """Evaluate trained YOLOv8 models. Use --source human|sam3|bama|faro."""
     cmd = f'uv run python "{PROJECT_DIR}/student/evaluate.py"'
     if source:
         cmd += f" --source {source}"

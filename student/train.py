@@ -19,7 +19,16 @@ def run_dir(source: str, model_name: str) -> Path:
 
 
 def train(source: str):
-    data_config = str(DATASETS_ROOT / source / "dataset.yaml")
+    # Try piglife structure first (e.g., datasets/piglife/yolo/human/dataset.yaml)
+    data_config = DATASETS_ROOT / source / "dataset.yaml"
+    if not data_config.exists():
+        # Try extra datasets structure (e.g., datasets/bama/yolo/dataset.yaml)
+        data_config = DATASETS_ROOT.parents[1] / source / "yolo" / "dataset.yaml"
+    
+    if not data_config.exists():
+        raise FileNotFoundError(f"Could not find dataset.yaml for source: {source} at {data_config}")
+
+    data_config = str(data_config)
 
     for model_name in MODELS:
         run = run_dir(source, model_name)
@@ -61,9 +70,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--source",
-        choices=["human", "sam3"],
         default=None,
-        help="Annotation source (default: run both sequentially)",
+        help="Annotation source (e.g., human, sam3, bama, faro). Default: human, sam3.",
     )
     args = parser.parse_args()
 
