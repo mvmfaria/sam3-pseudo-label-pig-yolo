@@ -3,13 +3,25 @@ from ultralytics import YOLO
 import argparse
 import torch
 
-DATASETS_ROOT = Path(__file__).resolve().parents[1] / "datasets" / "piglife" / "yolo"
-RUNS_ROOT = Path(__file__).resolve().parents[1] / "runs"
+BASE_DIR = Path(__file__).resolve().parents[1]
+DATASETS_PIGLIFE = BASE_DIR / "datasets" / "piglife" / "yolo"
+DATASETS_EXTRA = BASE_DIR / "datasets"
+RUNS_ROOT = BASE_DIR / "runs"
 
 MODELS = ["yolov8n.pt", "yolov8s.pt", "yolov8m.pt"]
 
 
-def evaluate(source: str):
+def predict(source: str):
+    # Try piglife structure first (e.g., datasets/piglife/yolo/human/dataset.yaml)
+    data_config = DATASETS_PIGLIFE / source / "dataset.yaml"
+    if not data_config.exists():
+        # Try extra datasets structure (e.g., datasets/bama/yolo/dataset.yaml)
+        data_config = DATASETS_EXTRA / source / "yolo" / "dataset.yaml"
+    
+    if not data_config.exists():
+        print(f"[error] Could not find dataset.yaml for source: {source}")
+        return
+
     for model_name in MODELS:
         run = RUNS_ROOT / source / model_name.replace(".pt", "")
         best_pt = run / "weights" / "best.pt"
@@ -18,10 +30,14 @@ def evaluate(source: str):
             print(f"[skip] {source}/{model_name} not trained yet")
             continue
 
-        print(f"[eval] {source}/{model_name}")
+        if not best_pt.exists():
+            print(f"[skip] {source}/{model_name} best.pt not found")
+            continue
+
+        print(f"[predict] {source}/{model_name}")
         model = YOLO(str(best_pt))
         model.val(
-            data=str(DATASETS_ROOT / source / "dataset.yaml"),
+            data=str(data_config),
             split="test",
             verbose=False,
             save_json=True,
@@ -45,21 +61,4 @@ if __name__ == "__main__":
 
     sources = [args.source] if args.source else ["human", "sam3"]
     for source in sources:
-        evaluate(source)
-   del model
-        torch.cuda.empty_cache()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--source",
-        choices=["human", "sam3"],
-        default=None,
-        help="Annotation source (default: evaluate both)",
-    )
-    args = parser.parse_args()
-
-    sources = [args.source] if args.source else ["human", "sam3"]
-    for source in sources:
-        evaluate(source)
+        predict(source)

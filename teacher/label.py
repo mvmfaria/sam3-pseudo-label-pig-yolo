@@ -5,6 +5,7 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 import json
 from pathlib import Path
+import argparse
 
 load_dotenv()
 token = os.getenv("HF_TOKEN")
@@ -16,11 +17,13 @@ CLASS_ID = 1
 CONFIDENCE_THRESHOLD = 0.4
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SOURCE_ROOT = BASE_DIR / "datasets" / "piglife" / "yolo" / "human"
-OUTPUT_ROOT = BASE_DIR / "datasets" / "piglife" / "coco" / "sam3" / "annotations"
 
-def generate_predictions(subset_name, model, processor, device):
-    image_dir = SOURCE_ROOT / "images" / subset_name
+def generate_predictions(subset_name, model, processor, device, image_root, output_root):
+    image_dir = image_root / subset_name
+    if not image_dir.exists():
+        print(f"[skip] Subset {subset_name} not found in {image_root}")
+        return
+
     image_files = [f for f in os.listdir(image_dir) if f.lower().endswith((".jpg", ".jpeg", ".png"))]
     
     coco_data = {
@@ -32,7 +35,7 @@ def generate_predictions(subset_name, model, processor, device):
     img_id_counter = 1
     ann_id_counter = 1
 
-    for img_name in tqdm(image_files):
+    for img_name in tqdm(image_files, desc=f"SAM3 {subset_name}"):
         img_path = image_dir / img_name
         image = Image.open(img_path).convert("RGB")
         img_width, img_height = image.size
@@ -84,12 +87,17 @@ def generate_predictions(subset_name, model, processor, device):
             
         img_id_counter += 1
 
-    os.makedirs(OUTPUT_ROOT, exist_ok=True)
-    output_file = OUTPUT_ROOT / f"instances_{subset_name}.json"
+    os.makedirs(output_root, exist_ok=True)
+    output_file = output_root / f"instances_{subset_name}.json"
     with open(output_file, "w") as f:
         json.dump(coco_data, f, indent=2)
     
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--image-dir", required=True, help="Root directory for images (should contain train/val/test subdirs)")
+    parser.add_argument("--output-dir", required=True, help="Directory to save COCO annotations")
+    args = parser.parse_args()
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     model = Sam3Model.from_pretrained(
@@ -99,6 +107,9 @@ if __name__ == "__main__":
     
     processor = Sam3Processor.from_pretrained("facebook/sam3")
 
+    image_root = Path(args.image_dir)
+    output_root = Path(args.output_dir)
+
     subsets = ["train", "val", "test"]
     for subset in subsets:
-        generate_predictions(subset, model, processor, device)
+        generate_predictions(subset, model, processor, device, image_root, output_root)

@@ -90,19 +90,19 @@ Output: `runs/{source}/{model}/weights/best.pt`
 
 ---
 
-### Step 4 — Evaluate models
+### Step 4 — Predict (Evaluate YOLO models)
 
 Runs YOLO validation on the test split for every trained model and saves COCO-format prediction JSONs.
 
 ```bash
-uv run inv evaluate
+uv run inv predict
 ```
 
-To evaluate a single source:
+To predict for a single source:
 
 ```bash
-uv run inv evaluate --source human
-uv run inv evaluate --source sam3
+uv run inv predict --source human
+uv run inv predict --source sam3
 ```
 
 Output: `runs/{source}/{model}/predictions.json`
@@ -145,26 +145,68 @@ uv run inv all
 
 You can also run experiments with the **BamaPig2D** and **FaroPigSeg** datasets. These datasets are converted from their original formats (COCO and YOLO Seg) to YOLO Detection format automatically.
 
-**1. Prepare the datasets**
+### 1. Download and Extract
 
-Ensure you have downloaded and unzipped them into `datasets/BamaPig2D` and `datasets/FaroPigSeg` as described in the "Expanding datasets experiments" section below. Then run:
+First, download the datasets into the `zips/` folder and extract them to `datasets/`:
 
+**FaroPigSeg**
 ```bash
-uv run inv setup_extra
+cd zips/
+wget https://data.chalearnlap.cvc.uab.cat/FaroPig/FaroPigSeg.zip
+unzip FaroPigSeg.zip -d ../datasets/
+cd ..
 ```
 
-**2. Train models**
-
+**BamaPig2D**
 ```bash
-uv run inv train --source bama
-uv run inv train --source faro
+cd zips/
+gdown 'https://drive.google.com/file/d/1yWBtNpYpkUdGKDqUAE7ya5m_fwinn0HN/view?usp=sharing'
+unzip BamaPig2D.zip -d ../datasets/
+cd ..
 ```
 
-**3. Evaluate models**
+### 2. Prepare the datasets
+
+This task converts the raw datasets (Bama's COCO and Faro's Segmentation) into the unified YOLO Detection format used in the project.
 
 ```bash
-uv run inv evaluate --source bama
-uv run inv evaluate --source faro
+uv run inv setup-bama-and-faro
+```
+
+### 3. Generate SAM3 Pseudo-labels (Optional)
+
+You can generate pseudo-labels specifically for these datasets using SAM3:
+
+```bash
+uv run inv label --dataset bama
+uv run inv label --dataset faro
+```
+
+Output: `datasets/sam3-bama/yolo/` and `datasets/sam3-faro/yolo/`
+
+### 4. Run SAM3 Zero-shot Predictions (Optional)
+
+To evaluate the zero-shot baseline of SAM3 on these datasets, generate the predictions file on the test split:
+
+```bash
+uv run inv predict-teacher --dataset bama
+uv run inv predict-teacher --dataset faro
+```
+
+Output: `datasets/sam3-bama/coco/annotations/predictions_test.json` and `datasets/sam3-faro/coco/annotations/predictions_test.json`
+
+### 5. Train and Predict
+
+Train models on the original (human) labels or the SAM3 pseudo-labels:
+
+```bash
+# Training
+uv run inv train --source bama       # Original human labels
+uv run inv train --source sam3-bama  # SAM3 pseudo-labels
+
+# Predictions
+uv run inv predict --source bama
+uv run inv predict --source sam3-bama
 ```
 
 ---
@@ -181,40 +223,6 @@ uv run streamlit run extra/gallery.py
 
 ```bash
 uv run inv --list
-```
-
----
-
-## Expanding datasets experiments
-
-### FaroPigSeg
-
-```bash
-cd zips/
-wget https://data.chalearnlap.cvc.uab.cat/FaroPig/FaroPigSeg.zip
-```
-
-After the download complete
-```bash
-unzip FaroPigSeg.zip -d ../datasets/
-```
-
-### BamaPig2D
-
-```bash
-cd zips/
-gdown 'https://drive.google.com/file/d/1yWBtNpYpkUdGKDqUAE7ya5m_fwinn0HN/view?usp=sharing'
-```
-
-After the download complete
-```bash
-unzip BamaPig2D.zip -d ../datasets/
-```
-
-Setup both datasets to YOLO's format
-```
-```bash
-uv run python -m invoke setup-bama-and-faro
 ```
 
 ## Citation

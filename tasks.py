@@ -74,7 +74,6 @@ def setup(c):
     steps = [
         ("Sanitizing filenames",            "sanitize.py",  ""),
         ("Splitting dataset (train/val)",   "split.py",     ""),
-        ("Converting COCO → YOLO (human)", "convert.py",   "--source human"),
         ("Organizing directory structure",  "organize.py",  ""),
     ]
 
@@ -97,9 +96,20 @@ def setup(c):
 
             console.print(f"  [green]✔[/green] {desc} completed.")
 
+    # Explicit COCO -> YOLO conversion for human source
+    with console.status("[bold white]Converting COCO → YOLO (human)...[/bold white]"):
+        c.run(
+            f'uv run python "{PROJECT_DIR}/datasets/convert.py" '
+            f'--annotations-dir "{PIGLIFE_DIR}/coco/human/annotations" '
+            f'--save-dir "{PIGLIFE_DIR}/yolo/human"',
+            hide=True
+        )
+    console.print("  [green]✔[/green] Converting COCO → YOLO (human) completed.")
+
     macosx_dir = images_dir / "__MACOSX"
     if macosx_dir.exists():
         shutil.rmtree(macosx_dir)
+
 
 @task(pre=[setup])
 def build(c):
@@ -108,21 +118,39 @@ def build(c):
 
 
 @task
-def label(c):
-    """Generate SAM3 pseudo-labels for train/val/test and convert to YOLO format."""
-    console.print("[white]Teacher pipeline:[/white]")
+def label(c, dataset="piglife"):
+    """Generate SAM3 pseudo-labels for a dataset. Use --dataset piglife|bama|faro."""
+    console.print(f"[white]Teacher pipeline for {dataset}:[/white]")
 
-    console.print("  Running SAM3 on all images (this takes a while)...")
-    c.run(f'uv run python "{PROJECT_DIR}/teacher/label.py"')
+    if dataset == "piglife":
+        img_dir = PIGLIFE_DIR / "yolo" / "human" / "images"
+        coco_dir = PIGLIFE_DIR / "coco" / "sam3" / "annotations"
+        yolo_dir = PIGLIFE_DIR / "yolo" / "sam3"
+        hardlink_src = img_dir
+    else:
+        # Extra datasets: bama, faro
+        img_dir = DATASET_DIR / dataset / "yolo" / "images"
+        coco_dir = DATASET_DIR / f"sam3-{dataset}" / "coco" / "annotations"
+        yolo_dir = DATASET_DIR / f"sam3-{dataset}" / "yolo"
+        hardlink_src = img_dir
+
+    if not img_dir.exists():
+        console.print(f"  [bold red]Error:[/bold red] Image directory {img_dir} not found. Did you run setup or setup_bama_and_faro?")
+        return
+
+    console.print(f"  Running SAM3 on images from {img_dir}...")
+    c.run(f'uv run python "{PROJECT_DIR}/teacher/label.py" --image-dir "{img_dir}" --output-dir "{coco_dir}"')
     console.print("  [green]✔[/green] SAM3 annotations generated.")
 
-    with console.status("[bold white]Converting SAM3 annotations → YOLO...[/bold white]"):
+    with console.status(f"[bold white]Converting SAM3 annotations ({dataset}) → YOLO...[/bold white]"):
         c.run(
-            f'uv run python "{PROJECT_DIR}/datasets/convert.py"'
-            f' --source sam3 --hardlink-images-from human',
+            f'uv run python "{PROJECT_DIR}/datasets/convert.py" '
+            f'--annotations-dir "{coco_dir}" '
+            f'--save-dir "{yolo_dir}" '
+            f'--hardlink-images-from "{hardlink_src}"',
             hide=True,
         )
-    console.print("  [green]✔[/green] SAM3 YOLO conversion complete.")
+    console.print(f"  [green]✔[/green] SAM3 YOLO conversion complete at {yolo_dir}")
 
 
 @task
@@ -130,7 +158,7 @@ def setup_bama_and_faro(c):
     """Prepare BamaPig2D and FaroPigSeg datasets for detection."""
     console.print("[white]Extra datasets pipeline:[/white]")
     with console.status("[bold white]Preparing extra datasets...[/bold white]"):
-        c.run(f'uv run python "{PROJECT_DIR}/datasets/prepare_extra.py"', hide=True)
+        c.run(f'uv run python "{PROJECT_DIR}/datasets/prepare_bama_and_faro.py"', hide=True)
     console.print("  [green]✔[/green] BamaPig2D and FaroPigSeg prepared.")
 
 
@@ -144,12 +172,34 @@ def train(c, source=None):
 
 
 @task
-def evaluate(c, source=None):
-    """Evaluate trained YOLOv8 models. Use --source human|sam3|bama|faro."""
-    cmd = f'uv run python "{PROJECT_DIR}/student/evaluate.py"'
+def predict(c, source=None):
+    """Predict/Evaluate trained YOLOv8 models. Use --source human|sam3|bama|faro."""
+    cmd = f'uv run python "{PROJECT_DIR}/student/predict.py"'
     if source:
         cmd += f" --source {source}"
     c.run(cmd)
+
+
+@task
+def predict_teacher(c, dataset="piglife"):
+    """Generate SAM3 zero-shot predictions for a dataset. Use --dataset piglife|bama|faro."""
+    console.print(f"[white]Teacher prediction pipeline for {dataset}:[/white]")
+
+    if dataset == "piglife":
+        img_dir = PIGLIFE_DIR / "yolo" / "human" / "images" / "test"
+        output_file = PROJECT_DIR / "teacher" / "predictions.json"
+    else:
+        # Extra datasets: bama, faro
+        img_dir = DATASET_DIR / dataset / "yolo" / "images" / "test"
+        output_file = DATASET_DIR / f"sam3-{dataset}" / "coco" / "annotations" / "predictions_test.json"
+
+    if not img_dir.exists():
+        console.print(f"  [bold red]Error:[/bold red] Image directory {img_dir} not found. Did you run setup or setup_bama_and_faro?")
+        return
+
+    console.print(f"  Running SAM3 inference on images from {img_dir}...")
+    c.run(f'uv run python "{PROJECT_DIR}/teacher/predict.py" --image-dir "{img_dir}" --output-file "{output_file}"')
+    console.print(f"  [green]✔[/green] SAM3 predictions complete at {output_file}")
 
 
 @task
@@ -179,11 +229,22 @@ def report(c):
 
 @task
 def all(c, source=None):
-    """Run the complete pipeline end-to-end: dataset → label → train → evaluate → metrics → report."""
+    """Run the complete pipeline end-to-end: dataset → label → train → predict → metrics → report."""
     build(c)
-    label(c)
+    
+    # If source is bama/faro, we label specifically that dataset
+    dataset = "piglife"
+    if source in ["bama", "faro"]:
+        dataset = source
+    
+    label(c, dataset=dataset)
+    
+    # If using extra datasets, run SAM3 zero-shot predictions for baseline evaluation
+    if dataset in ["bama", "faro"]:
+        predict_teacher(c, dataset=dataset)
+        
     train(c, source=source)
-    evaluate(c, source=source)
+    predict(c, source=source)
     metrics(c)
     report(c)
     console.print(Panel("[bold green]Full pipeline complete![/bold green]", border_style="green"))
