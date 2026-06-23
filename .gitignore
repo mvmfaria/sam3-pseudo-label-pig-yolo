@@ -5,7 +5,14 @@
 .claude
 
 datasets/piglife
-
+datasets/bama
+datasets/faro
+datasets/sam3-bama
+datasets/sam3-faro
+datasets/sam3-piglife
+datasets/BamaPig2D
+datasets/FaroPigSeg
+zip/
 *.pt
 runs/
 

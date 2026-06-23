@@ -17,7 +17,7 @@ def write_dataset_yaml(save_dir: str, annotations_dir: str):
         categories = sorted(data["categories"], key=lambda c: c["id"])
         break
 
-    splits = [s for s in ["train", "val", "test"] if (save_path / "images" / s).is_dir()]
+    splits = [s for s in ["train", "val", "test"] if (save_path / "labels" / s).is_dir()]
 
     lines = [f"path: {save_path}"]
     for split in splits:
@@ -36,7 +36,13 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--source",
+        "--annotations-dir",
+        type=str,
+        required=True,
+    )
+
+    parser.add_argument(
+        "--save-dir",
         type=str,
         required=True,
     )
@@ -44,13 +50,13 @@ def main():
     parser.add_argument(
         "--hardlink-images-from",
         type=str,
-        help="Create hardlinks for images from another source instead of copying",
+        help="Path to images directory to create hardlinks from (should contain train/val/test)",
     )
 
     args = parser.parse_args()
 
-    annotations_dir = f"datasets/piglife/coco/{args.source}/annotations/"
-    save_dir = f"datasets/piglife/yolo/{args.source}/"
+    annotations_dir = args.annotations_dir
+    save_dir = args.save_dir
 
     convert_coco(
         labels_dir=annotations_dir,
@@ -59,11 +65,9 @@ def main():
         cls91to80=False
     )
 
-    write_dataset_yaml(save_dir, annotations_dir)
-
     if args.hardlink_images_from:
-        src_images = os.path.abspath(f"datasets/piglife/yolo/{args.hardlink_images_from}/images")
-        dst_images = f"datasets/piglife/yolo/{args.source}/images"
+        src_images = os.path.abspath(args.hardlink_images_from)
+        dst_images = os.path.join(save_dir, "images")
 
         if os.path.islink(dst_images):
             os.unlink(dst_images)
@@ -79,6 +83,8 @@ def main():
                 dst_file = os.path.join(dst_split, filename)
                 if os.path.isfile(src_file) and not os.path.exists(dst_file):
                     os.link(src_file, dst_file)
+
+    write_dataset_yaml(save_dir, annotations_dir)
 
 if __name__ == "__main__":
     main()

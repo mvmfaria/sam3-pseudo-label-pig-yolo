@@ -118,6 +118,89 @@ def build_table2():
 """
     return table
 
+def build_table1_v2():
+    bench = load_metrics("benchmark.json")
+
+    def get_dataset_rows(dataset_name, human_source, sam3_source, has_zero_shot=False):
+        num_rows = 6 + (1 if has_zero_shot else 0)
+        rows = []
+        
+        # Human annotated rows
+        for idx, model in enumerate(YOLO_MODELS):
+            data = load_metrics(f"{model}_{human_source}_performance.json")
+            b = bench[f"{human_source}_{model}"]
+            display = MODEL_DISPLAY[model]
+            params = b["params_m"]
+            fwd = f"{b['inf_forward_ms']:.2f}"
+            pipe = f"{b['inf_pipeline_ms']:.2f}"
+            cells = metrics_cells(data)
+            
+            ds_cell = f"\\multirow{{{num_rows}}}{{*}}{{{dataset_name}}}" if (idx == 0) else ""
+            ann_cell = f"\\multirow{{3}}{{*}}{{\\makecell{{Human\\\\ annotated}}}}" if (idx == 0) else ""
+            
+            rows.append(f"  {ds_cell} & {ann_cell} & {display} & {params} & {fwd} & {pipe} & {cells} \\\\")
+            
+        rows.append("  \\cmidrule{2-11}")
+        
+        # SAM 3 generated rows
+        for idx, model in enumerate(YOLO_MODELS):
+            data = load_metrics(f"{model}_{sam3_source}_performance.json")
+            b = bench[f"{sam3_source}_{model}"]
+            display = MODEL_DISPLAY[model]
+            params = b["params_m"]
+            fwd = f"{b['inf_forward_ms']:.2f}"
+            pipe = f"{b['inf_pipeline_ms']:.2f}"
+            cells = metrics_cells(data)
+            
+            ds_cell = ""
+            ann_cell = f"\\multirow{{3}}{{*}}{{\\makecell{{SAM 3\\\\ generated}}}}" if (idx == 0) else ""
+            
+            rows.append(f"  {ds_cell} & {ann_cell} & {display} & {params} & {fwd} & {pipe} & {cells} \\\\")
+            
+        if has_zero_shot:
+            rows.append("  \\cmidrule{2-11}")
+            if dataset_name == "PigLife":
+                zero_file = "sam3_zero_shot_performance.json"
+            elif dataset_name == "BamaPig2D":
+                zero_file = "sam3_bama_zero_shot_performance.json"
+            elif dataset_name == "FaroPigSeg":
+                zero_file = "sam3_faro_zero_shot_performance.json"
+            else:
+                zero_file = "sam3_zero_shot_performance.json"
+
+            zero = load_metrics(zero_file)
+            b0 = bench["sam3_zero_shot"]
+            zero_cells = metrics_cells(zero)
+            rows.append(
+                f"   & \\makecell{{Zero-shot\\\\ baseline}} & SAM 3 & \\approxm{{{b0['params_m']}}} "
+                f"& {b0['inf_forward_ms']:.2f} & {b0['inf_pipeline_ms']:.2f} & {zero_cells} \\\\"
+            )
+            
+        return "\n".join(rows)
+
+    piglife_block = get_dataset_rows("PigLife", "human", "sam3", has_zero_shot=True)
+    bama_block = get_dataset_rows("BamaPig2D", "bama", "sam3-bama", has_zero_shot=True)
+    faro_block = get_dataset_rows("FaroPigSeg", "faro", "sam3-faro", has_zero_shot=True)
+
+    table = f"""\\begin{{table*}}[t]
+  \\caption{{Object detection performance (COCO metrics) of YOLOv8 models across datasets.}}
+  \\centering
+  \\label{{tab:yolo_ap_metrics_v2}}
+  \\begin{{tabular}}{{c c l c c c l l l l l}}
+  \\toprule
+  \\textbf{{Dataset}} & \\textbf{{Annotation}} & \\textbf{{Model}} & \\textbf{{Params (M)}} & \\textbf{{Inf. Forward (ms)}} & \\textbf{{Inf. Pipeline (ms)}} & \\textbf{{$mAP$}} & \\textbf{{$AP_{{50}}$}} & \\textbf{{$AP_{{75}}$}} & \\textbf{{$AP_{{M}}$}} & \\textbf{{$AP_{{L}}$}} \\\\
+  \\midrule
+{piglife_block}
+  \\midrule
+{bama_block}
+  \\midrule
+{faro_block}
+  \\bottomrule
+  \\end{{tabular}}
+\\end{{table*}}
+"""
+    return table
+
 
 if __name__ == "__main__":
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -128,8 +211,15 @@ if __name__ == "__main__":
         f.write(t1)
     print(f"Saved: {path1}")
 
+    t1_v2 = build_table1_v2()
+    path1_v2 = os.path.join(OUTPUT_DIR, "table1_v2_model_performance.tex")
+    with open(path1_v2, "w") as f:
+        f.write(t1_v2)
+    print(f"Saved: {path1_v2}")
+
     t2 = build_table2()
     path2 = os.path.join(OUTPUT_DIR, "table2_performance_per_group.tex")
     with open(path2, "w") as f:
         f.write(t2)
     print(f"Saved: {path2}")
+

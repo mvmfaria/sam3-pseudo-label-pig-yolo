@@ -8,16 +8,19 @@ import json
 import os
 import time
 from pathlib import Path
+from dotenv import load_dotenv
 
 import numpy as np
 import torch
 from ultralytics import YOLO
 
+load_dotenv()
+
 ROOT = str(Path(__file__).resolve().parents[2])
 OUTPUT_PATH = f"{ROOT}/reports/output/metrics/benchmark.json"
 
 YOLO_MODELS = ["yolov8n", "yolov8s", "yolov8m"]
-ANNOTATION_SOURCES = ["human", "sam3"]
+ANNOTATION_SOURCES = ["human", "sam3", "bama", "sam3-bama", "faro", "sam3-faro"]
 REPETITIONS = 300
 WARMUP = 20
 IMG_SIZE = 640
@@ -58,24 +61,29 @@ def benchmark_pipeline(yolo_wrapper, img_path, repetitions=REPETITIONS, warmup=W
 
 
 def benchmark_sam3(repetitions=100, warmup=10):
-    from transformers import Sam3Model
+    from transformers import Sam3Processor, Sam3Model
+    from PIL import Image
+    import numpy as np
 
     class SAM3Wrapper(torch.nn.Module):
         def __init__(self, model):
             super().__init__()
             self.model = model
 
-        def forward(self, pixel_values, input_boxes):
-            return self.model(pixel_values=pixel_values, input_boxes=input_boxes)
+        def forward(self, inputs):
+            return self.model(**inputs)
 
     model = Sam3Model.from_pretrained("facebook/sam3").to("cuda")
+    processor = Sam3Processor.from_pretrained("facebook/sam3")
+
+    dummy_img = Image.fromarray(np.zeros((1024, 1024, 3), dtype=np.uint8))
+    inputs = processor(images=dummy_img, text="pig", return_tensors="pt").to("cuda")
+
     wrapper = SAM3Wrapper(model)
-    dummy_pixels = torch.randn(1, 3, 1024, 1024, device="cuda")
-    dummy_boxes = torch.tensor([[[100, 100, 200, 200]]], device="cuda")
 
     mean_ms, std_ms = benchmark_forward(
         wrapper,
-        (dummy_pixels, dummy_boxes),  # handled below via *args
+        inputs,
         repetitions=repetitions,
         warmup=warmup,
     )
@@ -102,8 +110,11 @@ if __name__ == "__main__":
             fwd_mean, fwd_std = benchmark_forward(nn_model, dummy_input)
             pipe_mean, pipe_std = benchmark_pipeline(yolo, test_img)
 
+            params_m = round(sum(p.numel() for p in nn_model.parameters()) / 1e6, 1)
+
             key = f"{source}_{model_name}"
             results[key] = {
+                "params_m": params_m,
                 "inf_forward_ms": round(fwd_mean, 2),
                 "inf_forward_std_ms": round(fwd_std, 2),
                 "inf_pipeline_ms": round(pipe_mean, 2),
@@ -115,6 +126,7 @@ if __name__ == "__main__":
     sam_fwd, sam_fwd_std = benchmark_sam3()
     # Pipeline for SAM3 includes processor overhead — approximate as forward + fixed offset
     results["sam3_zero_shot"] = {
+        "params_m": 850,
         "inf_forward_ms": round(sam_fwd, 2),
         "inf_forward_std_ms": round(sam_fwd_std, 2),
         "inf_pipeline_ms": round(sam_fwd + 45.35, 2),  # offset from prior measurement
