@@ -27,7 +27,10 @@ def benchmark_forward(model_nn, dummy_input, repetitions=REPETITIONS, warmup=WAR
     model_nn.eval()
     with torch.no_grad():
         for _ in range(warmup):
-            model_nn(dummy_input)
+            if isinstance(dummy_input, dict) or hasattr(dummy_input, "keys"):
+                model_nn(**dummy_input)
+            else:
+                model_nn(dummy_input)
 
     starter = torch.cuda.Event(enable_timing=True)
     ender = torch.cuda.Event(enable_timing=True)
@@ -36,7 +39,10 @@ def benchmark_forward(model_nn, dummy_input, repetitions=REPETITIONS, warmup=WAR
     with torch.no_grad():
         for i in range(repetitions):
             starter.record()
-            model_nn(dummy_input)
+            if isinstance(dummy_input, dict) or hasattr(dummy_input, "keys"):
+                model_nn(**dummy_input)
+            else:
+                model_nn(dummy_input)
             ender.record()
             torch.cuda.synchronize()
             timings[i] = starter.elapsed_time(ender)
@@ -58,24 +64,25 @@ def benchmark_pipeline(yolo_wrapper, img_path, repetitions=REPETITIONS, warmup=W
 
 
 def benchmark_sam3(repetitions=100, warmup=10):
-    from transformers import Sam3Model
-
-    class SAM3Wrapper(torch.nn.Module):
-        def __init__(self, model):
-            super().__init__()
-            self.model = model
-
-        def forward(self, pixel_values, input_boxes):
-            return self.model(pixel_values=pixel_values, input_boxes=input_boxes)
+    from transformers import Sam3Model, Sam3Processor
+    from PIL import Image
 
     model = Sam3Model.from_pretrained("facebook/sam3").to("cuda")
-    wrapper = SAM3Wrapper(model)
-    dummy_pixels = torch.randn(1, 3, 1024, 1024, device="cuda")
-    dummy_boxes = torch.tensor([[[100, 100, 200, 200]]], device="cuda")
+    processor = Sam3Processor.from_pretrained("facebook/sam3")
+
+    # Generate correctly preprocessed inputs using processor (which manages sizes and shapes)
+    dummy_img = Image.fromarray(np.random.randint(0, 255, (1024, 1024, 3), dtype=np.uint8))
+    inputs = processor(images=dummy_img, text="pig", return_tensors="pt").to("cuda")
+
+    # Add optional dummy bounding boxes to match the previous wrapper's signature
+    inputs["input_boxes"] = torch.tensor([[[100.0, 100.0, 200.0, 200.0]]], device="cuda")
+
+    # Convert BatchFeature to a standard dict to guarantee unpacking
+    inputs = dict(inputs)
 
     mean_ms, std_ms = benchmark_forward(
-        wrapper,
-        (dummy_pixels, dummy_boxes),  # handled below via *args
+        model,
+        inputs,
         repetitions=repetitions,
         warmup=warmup,
     )
