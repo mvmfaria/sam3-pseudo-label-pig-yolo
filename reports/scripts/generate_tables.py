@@ -19,6 +19,12 @@ OUTPUT_DIR = f"{ROOT}/reports/output/latex"
 
 YOLO_MODELS = ["yolov8n", "yolov8s", "yolov8m"]
 MODEL_DISPLAY = {"yolov8n": "YOLOv8n", "yolov8s": "YOLOv8s", "yolov8m": "YOLOv8m"}
+MODEL_PARAMS = {
+    "yolov8n": "3.2",
+    "yolov8s": "11.2",
+    "yolov8m": "25.9",
+    "sam3_zero_shot": "840.4",
+}
 
 
 def fmt(value, decimals=1):
@@ -48,7 +54,7 @@ def build_table1():
             data = load_metrics(f"{model}_{source}_performance.json")
             b = bench[f"{source}_{model}"]
             display = MODEL_DISPLAY[model]
-            params = b["params_m"]
+            params = MODEL_PARAMS[model]
             fwd = f"{b['inf_forward_ms']:.2f}"
             pipe = f"{b['inf_pipeline_ms']:.2f}"
             cells = metrics_cells(data)
@@ -60,7 +66,7 @@ def build_table1():
     b0 = bench["sam3_zero_shot"]
     zero_cells = metrics_cells(zero)
     zero_row = (
-        f"  \\makecell{{Zero-shot\\\\ baseline}} & SAM 3 & \\approxm{{{b0['params_m']}}} "
+        f"  \\makecell{{Zero-shot\\\\ baseline}} & SAM 3 & \\approxm{{{MODEL_PARAMS['sam3_zero_shot']}}} "
         f"& {b0['inf_forward_ms']:.2f} & {b0['inf_pipeline_ms']:.2f} & {zero_cells} \\\\"
     )
 
