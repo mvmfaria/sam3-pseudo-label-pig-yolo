@@ -17,7 +17,8 @@ def write_dataset_yaml(save_dir: str, annotations_dir: str):
         categories = sorted(data["categories"], key=lambda c: c["id"])
         break
 
-    splits = [s for s in ["train", "val", "test"] if (save_path / "images" / s).is_dir()]
+    available_splits = [ann_file.stem.replace("instances_", "") for ann_file in ann_dir.glob("instances_*.json")]
+    splits = [s for s in ["train", "val", "test"] if s in available_splits]
 
     lines = [f"path: {save_path}"]
     for split in splits:
