@@ -9,7 +9,7 @@ GT_PATH = f"{ROOT}/datasets/piglife/coco/human/annotations/instances_test.json"
 OUTPUT_DIR = f"{ROOT}/reports/output/metrics"
 
 YOLO_MODELS = ["yolov8n", "yolov8s", "yolov8m"]
-ANNOTATION_SOURCES = ["human", "sam3"]
+ANNOTATION_SOURCES = ["human", "sam3", "dino"]
 
 
 def calculate_coco_metrics(ground_truth_path, predictions_path, output_path, model_name, trained):
@@ -56,20 +56,53 @@ def calculate_coco_metrics(ground_truth_path, predictions_path, output_path, mod
 
 
 if __name__ == "__main__":
-    calculate_coco_metrics(
-        ground_truth_path=GT_PATH,
-        predictions_path=f"{ROOT}/teacher/predictions.json",
-        output_path=f"{OUTPUT_DIR}/sam3_zero_shot_performance.json",
-        model_name="sam3",
-        trained="zero_shot",
-    )
+    # SAM3 zero-shot baseline
+    sam3_preds = f"{ROOT}/teacher/predictions.json"
+    if os.path.exists(sam3_preds):
+        calculate_coco_metrics(
+            ground_truth_path=GT_PATH,
+            predictions_path=sam3_preds,
+            output_path=f"{OUTPUT_DIR}/sam3_zero_shot_performance.json",
+            model_name="sam3",
+            trained="zero_shot",
+        )
 
+    # Grounding DINO zero-shot baseline
+    dino_test_json = f"{ROOT}/datasets/piglife/coco/dino/annotations/instances_test.json"
+    dino_preds_json = f"{ROOT}/teacher/predictions_dino.json"
+    if os.path.exists(dino_test_json):
+        with open(dino_test_json) as f:
+            dino_test = json.load(f)
+        id_to_filename = {img['id']: Path(img['file_name']).stem for img in dino_test['images']}
+        dino_preds = [
+            {
+                'image_id': id_to_filename[ann['image_id']],
+                'category_id': ann['category_id'],
+                'bbox': ann['bbox'],
+                'score': 1.0,
+            }
+            for ann in dino_test['annotations']
+        ]
+        with open(dino_preds_json, 'w') as f:
+            json.dump(dino_preds, f, indent=2)
+
+        calculate_coco_metrics(
+            ground_truth_path=GT_PATH,
+            predictions_path=dino_preds_json,
+            output_path=f"{OUTPUT_DIR}/dino_zero_shot_performance.json",
+            model_name="dino",
+            trained="zero_shot",
+        )
+
+    # YOLO models
     for source in ANNOTATION_SOURCES:
         for model in YOLO_MODELS:
-            calculate_coco_metrics(
-                ground_truth_path=GT_PATH,
-                predictions_path=f"{ROOT}/runs/{source}/{model}/predictions.json",
-                output_path=f"{OUTPUT_DIR}/{model}_{source}_performance.json",
-                model_name=model,
-                trained=source,
-            )
+            preds_file = f"{ROOT}/runs/{source}/{model}/predictions.json"
+            if os.path.exists(preds_file):
+                calculate_coco_metrics(
+                    ground_truth_path=GT_PATH,
+                    predictions_path=preds_file,
+                    output_path=f"{OUTPUT_DIR}/{model}_{source}_performance.json",
+                    model_name=model,
+                    trained=source,
+                )

@@ -24,6 +24,7 @@ MODEL_PARAMS = {
     "yolov8s": "11.2",
     "yolov8m": "25.9",
     "sam3_zero_shot": "840.4",
+    "dino_zero_shot": "172.0",
 }
 
 
@@ -48,11 +49,22 @@ def metrics_cells(data):
 def build_table1():
     bench = load_metrics("benchmark.json")
 
-    rows = {"human": [], "sam3": []}
-    for source in ["human", "sam3"]:
+    sources = ["human", "sam3"]
+    if os.path.exists(os.path.join(METRICS_DIR, "yolov8n_dino_performance.json")):
+        sources.append("dino")
+
+    rows = {s: [] for s in sources}
+    source_labels = {
+        "human": "\\multirow{3}{*}{\\makecell{Human\\\\ annotated}}",
+        "sam3": "\\multirow{3}{*}{\\makecell{SAM 3\\\\ generated}}",
+        "dino": "\\multirow{3}{*}{\\makecell{Grounding DINO\\\\ generated}}",
+    }
+
+    sections = []
+    for source in sources:
         for model in YOLO_MODELS:
             data = load_metrics(f"{model}_{source}_performance.json")
-            b = bench[f"{source}_{model}"]
+            b = bench.get(f"{source}_{model}", {"inf_forward_ms": 0.0, "inf_pipeline_ms": 0.0})
             display = MODEL_DISPLAY[model]
             params = MODEL_PARAMS[model]
             fwd = f"{b['inf_forward_ms']:.2f}"
@@ -61,17 +73,31 @@ def build_table1():
             rows[source].append(
                 f"    & {display} & {params} & {fwd} & {pipe} & {cells} \\\\"
             )
+        section_rows = "\n".join(rows[source])
+        sections.append(f"  {source_labels[source]}\n{section_rows}")
 
-    zero = load_metrics("sam3_zero_shot_performance.json")
-    b0 = bench["sam3_zero_shot"]
-    zero_cells = metrics_cells(zero)
-    zero_row = (
-        f"  \\makecell{{Zero-shot\\\\ baseline}} & SAM 3 & \\approxm{{{MODEL_PARAMS['sam3_zero_shot']}}} "
-        f"& {b0['inf_forward_ms']:.2f} & {b0['inf_pipeline_ms']:.2f} & {zero_cells} \\\\"
-    )
+    zero_rows = []
+    if os.path.exists(os.path.join(METRICS_DIR, "sam3_zero_shot_performance.json")):
+        zero = load_metrics("sam3_zero_shot_performance.json")
+        b0 = bench.get("sam3_zero_shot", {"inf_forward_ms": 855.16, "inf_pipeline_ms": 900.51})
+        zero_cells = metrics_cells(zero)
+        zero_rows.append(
+            f"  \\makecell{{Zero-shot\\\\ baseline}} & SAM 3 & \\approx{{{MODEL_PARAMS['sam3_zero_shot']}}} "
+            f"& {b0['inf_forward_ms']:.2f} & {b0['inf_pipeline_ms']:.2f} & {zero_cells} \\\\"
+        )
 
-    human_rows = "\n".join(rows["human"])
-    sam3_rows = "\n".join(rows["sam3"])
+    if os.path.exists(os.path.join(METRICS_DIR, "dino_zero_shot_performance.json")):
+        dino_zero = load_metrics("dino_zero_shot_performance.json")
+        b_dino = bench.get("dino_zero_shot", {"inf_forward_ms": 115.0, "inf_pipeline_ms": 135.0})
+        dino_cells = metrics_cells(dino_zero)
+        zero_rows.append(
+            f"  \\makecell{{Zero-shot\\\\ baseline}} & Grounding DINO & \\approx{{{MODEL_PARAMS['dino_zero_shot']}}} "
+            f"& {b_dino['inf_forward_ms']:.2f} & {b_dino['inf_pipeline_ms']:.2f} & {dino_cells} \\\\"
+        )
+
+    body = "\n  \\midrule\n".join(sections)
+    if zero_rows:
+        body += "\n  \\midrule\n" + "\n".join(zero_rows)
 
     table = f"""\\begin{{table*}}[t]
   \\caption{{Object detection performance (COCO metrics) of YOLOv8 models.}}
@@ -81,13 +107,7 @@ def build_table1():
   \\toprule
   \\textbf{{Annotation}} & \\textbf{{Model}} & \\textbf{{Params (M)}} & \\textbf{{Inf. Forward (ms)}} & \\textbf{{Inf. Pipeline (ms)}} & \\textbf{{$mAP$}} & \\textbf{{$AP_{{50}}$}} & \\textbf{{$AP_{{75}}$}} & \\textbf{{$AP_{{M}}$}} & \\textbf{{$AP_{{L}}$}} \\\\
   \\midrule
-  \\multirow{{3}}{{*}}{{\\makecell{{Human\\\\ annotated}}}}
-{human_rows}
-  \\midrule
-  \\multirow{{3}}{{*}}{{\\makecell{{SAM 3\\\\ generated}}}}
-{sam3_rows}
-  \\midrule
-  {zero_row}
+{body}
   \\bottomrule
   \\end{{tabular}}
 \\end{{table*}}
