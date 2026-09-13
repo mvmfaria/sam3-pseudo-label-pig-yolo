@@ -9,7 +9,7 @@ GT_PATH = f"{ROOT}/datasets/piglife/coco/human/annotations/instances_test.json"
 OUTPUT_DIR = f"{ROOT}/reports/output/metrics"
 
 YOLO_MODELS = ["yolov8n", "yolov8s", "yolov8m"]
-ANNOTATION_SOURCES = ["human", "sam3", "dino", "yoloworld"]
+ANNOTATION_SOURCES = ["human", "sam3", "dino", "yoloworld", "florence"]
 
 
 def calculate_coco_metrics(ground_truth_path, predictions_path, output_path, model_name, trained):
@@ -102,6 +102,17 @@ if __name__ == "__main__":
             predictions_path=yoloworld_preds,
             output_path=f"{OUTPUT_DIR}/yoloworld_zero_shot_performance.json",
             model_name="yoloworld",
+            trained="zero_shot",
+        )
+
+    # Florence-2 zero-shot baseline
+    florence_preds = f"{ROOT}/teacher/predictions_florence.json"
+    if os.path.exists(florence_preds):
+        calculate_coco_metrics(
+            ground_truth_path=GT_PATH,
+            predictions_path=florence_preds,
+            output_path=f"{OUTPUT_DIR}/florence_zero_shot_performance.json",
+            model_name="florence",
             trained="zero_shot",
         )
 

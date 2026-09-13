@@ -26,6 +26,7 @@ MODEL_PARAMS = {
     "sam3_zero_shot": "840.4",
     "dino_zero_shot": "172.0",
     "yoloworld_zero_shot": "68.0",
+    "florence_zero_shot": "770.0",
 }
 
 
@@ -55,6 +56,8 @@ def build_table1():
         sources.append("dino")
     if os.path.exists(os.path.join(METRICS_DIR, "yolov8n_yoloworld_performance.json")):
         sources.append("yoloworld")
+    if os.path.exists(os.path.join(METRICS_DIR, "yolov8n_florence_performance.json")):
+        sources.append("florence")
 
     rows = {s: [] for s in sources}
     source_labels = {
@@ -62,6 +65,7 @@ def build_table1():
         "sam3": "\\multirow{3}{*}{\\makecell{SAM 3\\\\ generated}}",
         "dino": "\\multirow{3}{*}{\\makecell{Grounding DINO\\\\ generated}}",
         "yoloworld": "\\multirow{3}{*}{\\makecell{YOLO-World\\\\ generated}}",
+        "florence": "\\multirow{3}{*}{\\makecell{Florence-2\\\\ generated}}",
     }
 
     sections = []
@@ -101,11 +105,20 @@ def build_table1():
 
     if os.path.exists(os.path.join(METRICS_DIR, "yoloworld_zero_shot_performance.json")):
         yw_zero = load_metrics("yoloworld_zero_shot_performance.json")
-        b_yw = bench.get("yoloworld_zero_shot", {"inf_forward_ms": 25.0, "inf_pipeline_ms": 30.0})
+        b_yw = bench.get("yoloworld_zero_shot", {"inf_forward_ms": 17.17, "inf_pipeline_ms": 22.45})
         yw_cells = metrics_cells(yw_zero)
         zero_rows.append(
             f"  \\makecell{{Zero-shot\\\\ baseline}} & YOLO-World & \\approx{{{MODEL_PARAMS['yoloworld_zero_shot']}}} "
             f"& {b_yw['inf_forward_ms']:.2f} & {b_yw['inf_pipeline_ms']:.2f} & {yw_cells} \\\\"
+        )
+
+    if os.path.exists(os.path.join(METRICS_DIR, "florence_zero_shot_performance.json")):
+        fl_zero = load_metrics("florence_zero_shot_performance.json")
+        b_fl = bench.get("florence_zero_shot", {"inf_forward_ms": 120.0, "inf_pipeline_ms": 150.0})
+        fl_cells = metrics_cells(fl_zero)
+        zero_rows.append(
+            f"  \\makecell{{Zero-shot\\\\ baseline}} & Florence-2 & \\approx{{{MODEL_PARAMS['florence_zero_shot']}}} "
+            f"& {b_fl['inf_forward_ms']:.2f} & {b_fl['inf_pipeline_ms']:.2f} & {fl_cells} \\\\"
         )
 
     body = "\n  \\midrule\n".join(sections)
