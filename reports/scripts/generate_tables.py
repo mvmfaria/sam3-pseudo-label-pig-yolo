@@ -25,6 +25,7 @@ MODEL_PARAMS = {
     "yolov8m": "25.9",
     "sam3_zero_shot": "840.4",
     "dino_zero_shot": "172.0",
+    "yoloworld_zero_shot": "68.0",
 }
 
 
@@ -52,12 +53,15 @@ def build_table1():
     sources = ["human", "sam3"]
     if os.path.exists(os.path.join(METRICS_DIR, "yolov8n_dino_performance.json")):
         sources.append("dino")
+    if os.path.exists(os.path.join(METRICS_DIR, "yolov8n_yoloworld_performance.json")):
+        sources.append("yoloworld")
 
     rows = {s: [] for s in sources}
     source_labels = {
         "human": "\\multirow{3}{*}{\\makecell{Human\\\\ annotated}}",
         "sam3": "\\multirow{3}{*}{\\makecell{SAM 3\\\\ generated}}",
         "dino": "\\multirow{3}{*}{\\makecell{Grounding DINO\\\\ generated}}",
+        "yoloworld": "\\multirow{3}{*}{\\makecell{YOLO-World\\\\ generated}}",
     }
 
     sections = []
@@ -93,6 +97,15 @@ def build_table1():
         zero_rows.append(
             f"  \\makecell{{Zero-shot\\\\ baseline}} & Grounding DINO & \\approx{{{MODEL_PARAMS['dino_zero_shot']}}} "
             f"& {b_dino['inf_forward_ms']:.2f} & {b_dino['inf_pipeline_ms']:.2f} & {dino_cells} \\\\"
+        )
+
+    if os.path.exists(os.path.join(METRICS_DIR, "yoloworld_zero_shot_performance.json")):
+        yw_zero = load_metrics("yoloworld_zero_shot_performance.json")
+        b_yw = bench.get("yoloworld_zero_shot", {"inf_forward_ms": 25.0, "inf_pipeline_ms": 30.0})
+        yw_cells = metrics_cells(yw_zero)
+        zero_rows.append(
+            f"  \\makecell{{Zero-shot\\\\ baseline}} & YOLO-World & \\approx{{{MODEL_PARAMS['yoloworld_zero_shot']}}} "
+            f"& {b_yw['inf_forward_ms']:.2f} & {b_yw['inf_pipeline_ms']:.2f} & {yw_cells} \\\\"
         )
 
     body = "\n  \\midrule\n".join(sections)

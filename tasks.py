@@ -109,7 +109,7 @@ def build(c):
 
 @task
 def label(c, method="sam3"):
-    """Generate pseudo-labels for train/val/test and convert to YOLO. Use --method sam3|dino."""
+    """Generate pseudo-labels for train/val/test and convert to YOLO. Use --method sam3|dino|yoloworld."""
     console.print(f"[white]Teacher pipeline ({method.upper()}):[/white]")
 
     if method == "dino":
@@ -118,8 +118,12 @@ def label(c, method="sam3"):
     elif method == "sam3":
         script_name = "label.py"
         source_name = "sam3"
+    elif method in ["yoloworld", "yolo_world"]:
+        script_name = "label_yoloworld.py"
+        source_name = "yoloworld"
+        method = "yoloworld"
     else:
-        console.print(f"[bold red]Error:[/bold red] Unknown method '{method}'. Choose 'sam3' or 'dino'.")
+        console.print(f"[bold red]Error:[/bold red] Unknown method '{method}'. Choose 'sam3', 'dino', or 'yoloworld'.")
         raise ValueError(f"Unknown method {method}")
 
     console.print(f"  Running {method.upper()} on all images (this takes a while)...")
@@ -137,7 +141,7 @@ def label(c, method="sam3"):
 
 @task
 def train(c, source=None):
-    """Train YOLOv8 (n/s/m) models. Use --source human|sam3|dino to train one variant."""
+    """Train YOLOv8 (n/s/m) models. Use --source human|sam3|dino|yoloworld to train one variant."""
     cmd = f'uv run python "{PROJECT_DIR}/student/train.py"'
     if source:
         cmd += f" --source {source}"
@@ -145,11 +149,13 @@ def train(c, source=None):
 
 
 @task
-def evaluate(c, source=None):
-    """Evaluate trained YOLOv8 models on the test set. Use --source human|sam3|dino for one variant."""
+def evaluate(c, source=None, device=None):
+    """Evaluate trained YOLOv8 models on the test set. Use --source human|sam3|dino|yoloworld for one variant."""
     cmd = f'uv run python "{PROJECT_DIR}/student/evaluate.py"'
     if source:
         cmd += f" --source {source}"
+    if device:
+        cmd += f" --device {device}"
     c.run(cmd)
 
 

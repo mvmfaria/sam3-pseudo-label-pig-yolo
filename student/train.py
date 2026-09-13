@@ -61,12 +61,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--source",
-        choices=["human", "sam3", "dino"],
+        choices=["human", "sam3", "dino", "yoloworld"],
         default=None,
-        help="Annotation source (default: run both sequentially)",
+        help="Annotation source (default: run all sequentially)",
     )
     args = parser.parse_args()
 
-    sources = [args.source] if args.source else ["human", "sam3", "dino"]
+    sources = [args.source] if args.source else ["human", "sam3", "dino", "yoloworld"]
     for source in sources:
         train(source)
