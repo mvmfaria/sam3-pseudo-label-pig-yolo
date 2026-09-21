@@ -6,8 +6,24 @@
 </tr></table>
 
 [![arXiv](https://img.shields.io/badge/arXiv-2605.25860-b31b1b.svg)](https://doi.org/10.48550/arXiv.2605.25860)
+[![Hugging Face Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-blue)](https://huggingface.co/datasets/marcosvmf/sam3-piglife-labels)
+[![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/marcosvmf/yolov8-piglife-sam3)
 
 Knowledge distillation experiment using SAM3 as a teacher model to generate pseudo-labels for training compact YOLOv8 detection models on the PigLife dataset.
+
+### Hugging Face Artifacts
+
+* **Dataset (SAM3 Pseudo-Labels):** [`marcosvmf/sam3-piglife-labels`](https://huggingface.co/datasets/marcosvmf/sam3-piglife-labels)
+* **Pre-trained Models (YOLOv8 Weights):** [`marcosvmf/yolov8-piglife-sam3`](https://huggingface.co/marcosvmf/yolov8-piglife-sam3)
+
+You can run inference directly with our pre-trained models via Ultralytics without running the full training pipeline:
+
+```python
+from ultralytics import YOLO
+
+model = YOLO("hf://marcosvmf/yolov8-piglife-sam3/yolov8s-pig.pt")
+results = model.predict("path/to/pig_image.jpg")
+```
 
 ## Requirements
 
