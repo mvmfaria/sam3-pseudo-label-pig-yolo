@@ -108,26 +108,44 @@ def build(c):
 
 
 @task
-def label(c):
-    """Generate SAM3 pseudo-labels for train/val/test and convert to YOLO format."""
-    console.print("[white]Teacher pipeline:[/white]")
+def label(c, method="sam3"):
+    """Generate pseudo-labels for train/val/test and convert to YOLO. Use --method sam3|dino|yoloworld|florence."""
+    console.print(f"[white]Teacher pipeline ({method.upper()}):[/white]")
 
-    console.print("  Running SAM3 on all images (this takes a while)...")
-    c.run(f'uv run python "{PROJECT_DIR}/teacher/label.py"')
-    console.print("  [green]✔[/green] SAM3 annotations generated.")
+    if method == "dino":
+        script_name = "label_dino.py"
+        source_name = "dino"
+    elif method == "sam3":
+        script_name = "label.py"
+        source_name = "sam3"
+    elif method in ["yoloworld", "yolo_world"]:
+        script_name = "label_yoloworld.py"
+        source_name = "yoloworld"
+        method = "yoloworld"
+    elif method in ["florence", "florence2", "florence-2"]:
+        script_name = "label_florence.py"
+        source_name = "florence"
+        method = "florence"
+    else:
+        console.print(f"[bold red]Error:[/bold red] Unknown method '{method}'. Choose 'sam3', 'dino', 'yoloworld', or 'florence'.")
+        raise ValueError(f"Unknown method {method}")
 
-    with console.status("[bold white]Converting SAM3 annotations → YOLO...[/bold white]"):
+    console.print(f"  Running {method.upper()} on all images (this takes a while)...")
+    c.run(f'uv run python "{PROJECT_DIR}/teacher/{script_name}"')
+    console.print(f"  [green]✔[/green] {method.upper()} annotations generated.")
+
+    with console.status(f"[bold white]Converting {method.upper()} annotations → YOLO...[/bold white]"):
         c.run(
             f'uv run python "{PROJECT_DIR}/datasets/convert.py"'
-            f' --source sam3 --hardlink-images-from human',
+            f' --source {source_name} --hardlink-images-from human',
             hide=True,
         )
-    console.print("  [green]✔[/green] SAM3 YOLO conversion complete.")
+    console.print(f"  [green]✔[/green] {method.upper()} YOLO conversion complete.")
 
 
 @task
 def train(c, source=None):
-    """Train YOLOv8 (n/s/m) models. Use --source human|sam3 to train one variant."""
+    """Train YOLOv8 (n/s/m) models. Use --source human|sam3|dino|yoloworld|florence to train one variant."""
     cmd = f'uv run python "{PROJECT_DIR}/student/train.py"'
     if source:
         cmd += f" --source {source}"
@@ -135,11 +153,13 @@ def train(c, source=None):
 
 
 @task
-def evaluate(c, source=None):
-    """Evaluate trained YOLOv8 models on the test set. Use --source human|sam3 for one variant."""
+def evaluate(c, source=None, device=None):
+    """Evaluate trained YOLOv8 models on the test set. Use --source human|sam3|dino|yoloworld|florence for one variant."""
     cmd = f'uv run python "{PROJECT_DIR}/student/evaluate.py"'
     if source:
         cmd += f" --source {source}"
+    if device:
+        cmd += f" --device {device}"
     c.run(cmd)
 
 
@@ -169,12 +189,30 @@ def report(c):
 
 
 @task
-def all(c, source=None):
+def videos(c, model="yolov8n", split="test", fps=8, conf=0.3):
+    """Generate side-by-side and individual comparison videos for Human vs SAM3 vs DINO."""
+    console.print(Panel(f"[bold white]Generating comparison videos...[/bold white]\n[dim]Model: {model} | Split: {split} | FPS: {fps}[/dim]", border_style="#13294c"))
+    cmd = f'uv run python "{PROJECT_DIR}/benchmark/generate_comparison_videos.py" --model {model} --split {split} --fps {fps} --conf {conf}'
+    c.run(cmd)
+    console.print("[green]✔[/green] Videos saved to [bold]reports/videos/[/bold]")
+
+
+@task
+def custom_videos(c, input_dir="inputs/videos", model="yolov8n", seconds=15, fps=25, conf=0.3):
+    """Process custom uploaded videos (clips first N seconds of each) and generate comparisons."""
+    console.print(Panel(f"[bold white]Processing custom user videos...[/bold white]\n[dim]Dir: {input_dir} | Seconds/video: {seconds}s | FPS: {fps}[/dim]", border_style="#13294c"))
+    cmd = f'uv run python "{PROJECT_DIR}/benchmark/process_custom_videos.py" --input-dir {input_dir} --model {model} --seconds {seconds} --fps {fps} --conf {conf}'
+    c.run(cmd)
+    console.print("[green]✔[/green] Custom videos saved to [bold]reports/videos/[/bold]")
+
+
+@task
+def all(c, source=None, method="sam3"):
     """Run the complete pipeline end-to-end: dataset → label → train → evaluate → metrics → report."""
     build(c)
-    label(c)
-    train(c, source=source)
-    evaluate(c, source=source)
+    label(c, method=method)
+    train(c, source=source or method)
+    evaluate(c, source=source or method)
     metrics(c)
     report(c)
     console.print(Panel("[bold green]Full pipeline complete![/bold green]", border_style="green"))

@@ -10,3 +10,9 @@ datasets/piglife
 runs/
 
 reports/output/
+
+__pycache__/
+*.pyc
+inputs/
+teacher/predictions*.json
+todo.txt
